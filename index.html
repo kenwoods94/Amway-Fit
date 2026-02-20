@@ -298,9 +298,11 @@
       </div>
 
       <div class="row" style="margin-top:14px;">
-        <button class="btn secondary" id="editBtn">Edit Answers</button>
-        <button class="btn" id="downloadBtn">Download Responses (JSON)</button>
-      </div>
+  <button class="btn secondary" id="editBtn">Edit Answers</button>
+  <button class="btn secondary" id="downloadBtn">Download (JSON)</button>
+  <button class="btn" id="submitBtn">Submit</button>
+</div>
+<p class="muted" id="submitStatus" style="margin-top:10px;"></p>
 
       <p class="muted" style="margin-top:10px;">
         Reminder: Results are directional and based only on your answers—this does not guarantee outcomes.
@@ -315,14 +317,39 @@
     };
 
     document.getElementById("downloadBtn").onclick = downloadJSON;
-  }
+    document.getElementById("submitBtn").onclick = submitToSheet;  }
 
   function hideResults() {
     questionCard.style.display = "block";
     resultCard.style.display = "none";
   }
+async function submitToSheet() {
+  const payload = {
+    submittedAt: new Date().toISOString(),
+    score: totalScore(),
+    answers: Object.fromEntries(Object.entries(answers).map(([k,v]) => [k, v.value]))
+  };
 
-  function downloadJSON() {
+  // Paste your Apps Script Web App URL (ends with /exec)
+  const ENDPOINT = "https://script.google.com/macros/s/AKfycbw7Pru3IIjn-DPPTxHkYrgGwvacJKWK0fWDmfmBYoquyae33onfHwPYmoZhM-xoslrfcA/exec";
+
+  const statusEl = document.getElementById("submitStatus");
+  statusEl.textContent = "Submitting...";
+
+  try {
+    await fetch(ENDPOINT, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    statusEl.textContent = "Submitted. Thank you!";
+  } catch (err) {
+    statusEl.textContent = "Submission failed. Please try again.";
+    console.error(err);
+  }
+}  function downloadJSON() {
     const payload = {
       submittedAt: new Date().toISOString(),
       score: totalScore(),
