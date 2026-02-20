@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Business Fit Questionnaire</title>
+  <style>
+    :root { font-family: -apple-system, system-ui, Segoe UI, Roboto, Arial, sans-serif; line-height: 1.35; }
+    body { margin: 0; background: #f6f7fb; color: #111; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 60px; }
+    .card { background: white; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,.07); padding: 18px 18px; margin-bottom: 14px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    p { margin: 8px 0; color: #333; }
+    .muted { color: #555; font-size: 13px; }
+    .bar { height: 10px; background: #e8eaf3; border-radius: 999px; overflow: hidden; }
+    .bar > div { height: 100%; width: 0%; background: #4f46e5; transition: width .25s ease; }
+    .q { margin-top: 12px; }
+    .q h2 { font-size: 16px; margin: 0 0 10px; }
+    .opts { display: grid; gap: 8px; }
+    label.opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 10px; border: 1px solid #e6e7ef; border-radius: 12px; cursor: pointer; }
+    label.opt:hover { border-color: #cfd2ff; }
+    input[type="radio"] { margin-top: 2px; }
+    input[type="text"], textarea {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border: 1px solid #e6e7ef; border-radius: 12px; font-size: 14px;
+    }
+    textarea { min-height: 88px; resize: vertical; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer;
+      background: #111; color: white; font-weight: 600;
+    }
+    .btn.secondary { background: #eef0ff; color: #1f2a66; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .pill { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .green { background: #e8f8ee; color: #0b6b2c; }
+    .yellow { background: #fff7e6; color: #7a4a00; }
+    .red { background: #ffecec; color: #8b1b1b; }
+    .result h2 { margin: 0 0 8px; }
+    .kvs { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+    .kv { border: 1px dashed #d7dbff; border-radius: 12px; padding: 10px; }
+    .kv b { display:block; margin-bottom: 4px; }
+    .footer { text-align: center; margin-top: 18px; }
+    .small { font-size: 12px; color: #555; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Could this business be a fit?</h1>
+      <p class="muted">
+        This is a quick self-check to see whether exploring a business opportunity could fit your goals, time, and preferences.
+        <b>No pressure</b>—the goal is clarity.
+      </p>
+      <div class="bar" aria-label="progress"><div id="bar"></div></div>
+      <p class="muted" id="progressText">Question 1 of 10</p>
+    </div>
+
+    <div class="card q" id="questionCard"></div>
+    <div class="card" id="resultCard" style="display:none;"></div>
+
+    <div class="footer small">
+      Tip: You can run this locally. No data is sent anywhere unless you add that later.
+    </div>
+  </div>
+
+<script>
+  // Simple scoring model (not promises, just "fit signals").
+  // Green: strong alignment, Yellow: maybe with adjustments, Red: likely not now.
+  const questions = [
+    {
+      id: "why",
+      title: "1) What would you want an additional income stream to do for you?",
+      type: "radio",
+      options: [
+        { label: "Extra breathing room / margin", score: 2 },
+        { label: "Debt payoff", score: 2 },
+        { label: "Savings / investing", score: 2 },
+        { label: "More flexibility / options", score: 2 },
+        { label: "Just exploring / not sure yet", score: 1 }
+      ]
+    },
+    {
+      id: "whyNow",
+      title: "2) Why now? What’s prompting you to look at something?",
+      type: "text",
+      placeholder: "A sentence or two is fine.",
+      score: 0
+    },
+    {
+      id: "hours",
+      title: "3) Realistically, how many hours per week could you give to building something?",
+      type: "radio",
+      options: [
+        { label: "1–2 hours", score: 0 },
+        { label: "3–5 hours", score: 2 },
+        { label: "6–10 hours", score: 3 },
+        { label: "10+ hours", score: 3 }
+      ]
+    },
+    {
+      id: "consistency",
+      title: "4) Which describes you best right now?",
+      type: "radio",
+      options: [
+        { label: "Busy, but consistent when I commit", score: 3 },
+        { label: "My schedule is chaotic right now", score: 1 },
+        { label: "I have margin and want to use it well", score: 3 }
+      ]
+    },
+    {
+      id: "followThrough",
+      title: "5) When you start something new, what helps you follow through most?",
+      type: "radio",
+      options: [
+        { label: "A clear plan", score: 2 },
+        { label: "Accountability", score: 2 },
+        { label: "Community", score: 2 },
+        { label: "Quick wins", score: 1 },
+        { label: "Flexibility", score: 1 }
+      ]
+    },
+    {
+      id: "recommend",
+      title: "6) Do you enjoy recommending things you genuinely like to people you know?",
+      type: "radio",
+      options: [
+        { label: "Yes", score: 3 },
+        { label: "Sometimes", score: 2 },
+        { label: "Not really", score: 0 }
+      ]
+    },
+    {
+      id: "learnSystem",
+      title: "7) How do you feel about learning a simple system and practicing it?",
+      type: "radio",
+      options: [
+        { label: "I like systems", score: 3 },
+        { label: "If it’s straightforward, yes", score: 2 },
+        { label: "I’m not a “system” person", score: 0 }
+      ]
+    },
+    {
+      id: "inviting",
+      title: "8) How comfortable are you having short conversations to invite someone to take a look?",
+      type: "radio",
+      options: [
+        { label: "Comfortable", score: 3 },
+        { label: "I could learn", score: 2 },
+        { label: "I avoid that kind of thing", score: 0 }
+      ]
+    },
+    {
+      id: "style",
+      title: "9) How would you prefer to build—online, in-person, or a mix?",
+      type: "radio",
+      options: [
+        { label: "Online", score: 2 },
+        { label: "In-person", score: 2 },
+        { label: "A mix of both", score: 3 }
+      ]
+    },
+    {
+      id: "support",
+      title: "10) What kind of support would you want if you explored this?",
+      type: "radio",
+      options: [
+        { label: "Mentorship/coaching", score: 3 },
+        { label: "Community", score: 3 },
+        { label: "Training resources", score: 2 },
+        { label: "All of the above", score: 3 }
+      ]
+    }
+  ];
+
+  let i = 0;
+  const answers = {}; // {id: {value, score}}
+  const bar = document.getElementById("bar");
+  const progressText = document.getElementById("progressText");
+  const questionCard = document.getElementById("questionCard");
+  const resultCard = document.getElementById("resultCard");
+
+  function pct(n, d){ return Math.round((n/d)*100); }
+
+  function render() {
+    const total = questions.length;
+    const q = questions[i];
+    bar.style.width = pct(i, total) + "%";
+    progressText.textContent = `Question ${i+1} of ${total}`;
+
+    const saved = answers[q.id]?.value ?? "";
+
+    let html = `<h2>${q.title}</h2>`;
+
+    if (q.type === "radio") {
+      html += `<div class="opts" role="radiogroup" aria-label="${q.title}">`;
+      q.options.forEach((opt) => {
+        const checked = (saved === opt.label) ? "checked" : "";
+        html += `
+          <label class="opt">
+            <input type="radio" name="${q.id}" value="${opt.label}" data-score="${opt.score}" ${checked}/>
+            <div>${opt.label}</div>
+          </label>
+        `;
+      });
+      html += `</div>`;
+    } else if (q.type === "text") {
+      html += `<textarea id="textInput" placeholder="${q.placeholder}">${saved}</textarea>`;
+    }
+
+    html += `
+      <div class="row" style="margin-top:14px;">
+        <button class="btn secondary" id="backBtn" ${i===0 ? "disabled":""}>Back</button>
+        <button class="btn" id="nextBtn">${i === total-1 ? "See Results" : "Next"}</button>
+        <button class="btn secondary" id="resetBtn" style="margin-left:auto;">Reset</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">
+        Note: This doesn’t predict outcomes or earnings—just checks alignment of goals, time, and preferences.
+      </p>
+    `;
+
+    questionCard.innerHTML = html;
+
+    document.getElementById("backBtn").onclick = () => { if (i>0) { i--; render(); } };
+    document.getElementById("resetBtn").onclick = () => { i = 0; for (const k in answers) delete answers[k]; hideResults(); render(); };
+
+    document.getElementById("nextBtn").onclick = () => {
+      if (!saveAnswer(q)) return;
+      if (i < total-1) { i++; render(); }
+      else showResults();
+    };
+  }
+
+  function saveAnswer(q) {
+    if (q.type === "radio") {
+      const sel = questionCard.querySelector(`input[name="${q.id}"]:checked`);
+      if (!sel) { alert("Please choose an option to continue."); return false; }
+      answers[q.id] = { value: sel.value, score: Number(sel.dataset.score || 0) };
+      return true;
+    }
+    if (q.type === "text") {
+      const txt = (document.getElementById("textInput").value || "").trim();
+      if (!txt) { alert("Please type a short answer to continue."); return false; }
+      answers[q.id] = { value: txt, score: 0 };
+      return true;
+    }
+    return false;
+  }
+
+  function totalScore() {
+    return Object.values(answers).reduce((sum, a) => sum + (a.score || 0), 0);
+  }
+
+  function showResults() {
+    questionCard.style.display = "none";
+    resultCard.style.display = "block";
+    bar.style.width = "100%";
+    progressText.textContent = "Done";
+
+    const score = totalScore();
+    let label, pillClass, headline, nextStep;
+
+    if (score >= 20) {
+      label = "Green";
+      pillClass = "pill green";
+      headline = "Strong alignment to explore";
+      nextStep = "If you want, the next step is a short overview of how the system works and what it looks like week-to-week.";
+    } else if (score >= 13) {
+      label = "Yellow";
+      pillClass = "pill yellow";
+      headline = "Possible fit with a few questions";
+      nextStep = "It may be worth a look—especially if we can design a plan that fits your schedule and comfort level.";
+    } else {
+      label = "Red";
+      pillClass = "pill red";
+      headline = "Probably not a fit right now";
+      nextStep = "No problem. If timing changes later, we can revisit. For now, we can keep it simple and stay connected.";
+    }
+
+    const whyNow = answers.whyNow?.value || "(not answered)";
+    const hours = answers.hours?.value || "(not answered)";
+    const style = answers.style?.value || "(not answered)";
+
+    resultCard.className = "card result";
+    resultCard.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span class="${pillClass}">${label}</span>
+        <h2 style="margin:0;">${headline}</h2>
+      </div>
+
+      <p><b>What this means:</b> ${nextStep}</p>
+
+      <div class="kvs">
+        <div class="kv"><b>Your “why now”</b><div>${escapeHtml(whyNow)}</div></div>
+        <div class="kv"><b>Time you said you have</b><div>${escapeHtml(hours)}</div></div>
+        <div class="kv"><b>Preferred build style</b><div>${escapeHtml(style)}</div></div>
+      </div>
+
+      <div class="row" style="margin-top:14px;">
+        <button class="btn secondary" id="editBtn">Edit Answers</button>
+        <button class="btn" id="downloadBtn">Download Responses (JSON)</button>
+      </div>
+
+      <p class="muted" style="margin-top:10px;">
+        Reminder: Results are directional and based only on your answers—this does not guarantee outcomes.
+      </p>
+    `;
+
+    document.getElementById("editBtn").onclick = () => {
+      resultCard.style.display = "none";
+      questionCard.style.display = "block";
+      i = questions.length - 1;
+      render();
+    };
+
+    document.getElementById("downloadBtn").onclick = downloadJSON;
+  }
+
+  function hideResults() {
+    questionCard.style.display = "block";
+    resultCard.style.display = "none";
+  }
+
+  function downloadJSON() {
+    const payload = {
+      submittedAt: new Date().toISOString(),
+      score: totalScore(),
+      answers: Object.fromEntries(Object.entries(answers).map(([k,v]) => [k, v.value]))
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "questionnaire-responses.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function escapeHtml(str){
+    return String(str)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  render();
+</script>
+</body>
+</html>
